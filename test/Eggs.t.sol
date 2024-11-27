@@ -2,18 +2,19 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
-import {Counter} from "../src/Counter.sol";
+import {EGGS} from "../src/eggs.sol";
 
-contract CounterTest is Test {
-    Counter public counter;
+contract EggsTest is Test {
+    EGGS public eggs;
 
     function setUp() public {
-        counter = new Counter();
-        counter.setNumber(0);
+        counter = new eggs({value: 10 * 10e18});
+        counter.setStart();
+        counter.setFeeAddress(msg.sender);
     }
 
     function test_Increment() public {
-        counter.increment();
+        counter.buy{value: 10 * 10e18}(msg.sender);
         assertEq(counter.number(), 1);
     }
 
