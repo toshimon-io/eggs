@@ -101,6 +101,7 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
     }
     function sell(uint256 eggs) external nonReentrant {
         require(eggs > MIN, "must trade over min");
+        liquidate();
 
         // Total Eth to be sent
         uint256 sonic = EGGStoSONIC(eggs);
