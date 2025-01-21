@@ -15,18 +15,43 @@ contract CounterScript is Script {
     }
 
     EGGS public eggs =
-        EGGS(payable(0xa583f57798F9326a026AbD9e5053Af686413b03f));
+        EGGS(payable(0x8AAFD3ede9AdB0Ff97C7AEbCe82a919AFb1C8764));
+    //0x5Eb9cC76c3506942c1c0Ead70e877dD5e4f00cb0
 
     function setUp() public {}
     uint256 blokc = block.number;
     function run() public {
         vm.startBroadcast();
 
-        /*uint256 eggtotal = 1 * 10 ** 17;
+        //uint256 eggtotal = 1 * 10 ** 17;
         (uint256 collateral2, uint256 borrowed2, uint256 collateralcov2) = eggs
-            .getLoanByAddress(0xbD5764D2b701D9A67756B570922db9ca09276a1a);
-        console.log(borrowed2);*/
-        eggs.sell(1 ether);
+            .getLoanByAddress(0x4D4A6aff095F40070A072FC877d9293D1341E628);
+
+        //eggs.sell(eggs.balanceOf(msg.sender));
+        uint256 bal = eggs.balanceOf(msg.sender);
+        uint256 bal2 = eggs.balanceOf(
+            0x8AAFD3ede9AdB0Ff97C7AEbCe82a919AFb1C8764
+        );
+
+        uint256 amt = eggs.getTotalCollateral();
+        uint256 last = eggs.lastLiquidationDate();
+        uint256 tim = eggs.getMidnightTimestamp(block.timestamp);
+        uint256 amt2 = eggs.lastPrice();
+
+        uint256 newcat = eggs.totalSupply() - collateral2;
+        uint256 newBorrowed = eggs.getBacking() - borrowed2;
+        uint256 priceAfterBomb = (newBorrowed * 1 ether) / newcat;
+
+        console.log(amt2);
+        console.log(priceAfterBomb);
+        console.log((priceAfterBomb * 100) / amt2);
+        //eggs.setFeeAddress(0x04fE38cbE12227a4AB51B78b6F801F1C4C7c3E58);
+        if (bal > 10000) {
+            eggs.sell(eggs.balanceOf(msg.sender));
+        } else {
+            eggs.buy{value: 1 ether}(msg.sender);
+        }
+
         // eggs.liquidate();
 
         //eggs.setFeeAddress(msg.sender);

@@ -2,11 +2,10 @@
 pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Capped.sol";
 
-contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
+contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     address payable private FEE_ADDRESS;
 
     uint256 public constant MIN = 1000;
@@ -17,7 +16,7 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
     uint16 public constant FEE_BASE_1000 = 1000;
 
     uint16 public constant FEES_BUY = 333;
-    uint16 public constant FEES_SELL = 80;
+    uint16 public constant FEES_SELL = 125;
 
     bool public start = false;
 
@@ -26,8 +25,6 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
     uint256 private totalBorrowed = 0;
     uint256 private totalCollateral = 0;
 
-    uint256 public LoanFEEMax = 200 * SONICinWEI;
-    uint256 public LoanFEEMin = 175 * SONICinWEI;
     uint128 public constant maxSupply = 100000000000 * SONICinWEI;
     uint256 public totalMinted;
     uint256 public lastPrice = 0;
@@ -52,6 +49,7 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
         lastLiquidationDate = getMidnightTimestamp(block.timestamp);
         mint(msg.sender, msg.value * MIN);
         mint(address(this), 10000);
+
         _transfer(
             address(this),
             0x000000000000000000000000000000000000dEaD,
@@ -63,22 +61,26 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
     }
 
     function mint(address to, uint256 value) private {
-        require(totalMinted <= maxSupply, "NO MORE EGGS");
+        require(to != address(0x0), "Can't mint to to 0x0 address");
         totalMinted += value;
+        require(totalMinted <= maxSupply, "NO MORE EGGS");
+
         _mint(to, value);
     }
 
-    //Will be set to 100m eth value after 1 hr
-    function setMax(uint256 _max) public onlyOwner {
-        emit MaxUpdated(_max);
-    }
     function setFeeAddress(address _address) external onlyOwner {
-        require(_address != address(0x0));
+        require(
+            _address != address(0x0),
+            "Can't set fee address to 0x0 address"
+        );
         FEE_ADDRESS = payable(_address);
     }
 
     function setBuyFee(uint16 amount) external onlyOwner {
-        require(amount <= 969 && amount >= 10);
+        require(
+            amount <= 1000 && amount >= 990,
+            "buy fee must be in safe range"
+        );
         BUY_FEE = amount;
         emit buyFeeUpdated(amount);
     }
@@ -86,7 +88,7 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
         address reciever
     ) external payable nonReentrant returns (uint256) {
         liquidate();
-        require(start);
+        require(start, "Trading must be initialized");
         require(msg.value > MIN, "must trade over min");
 
         // Mint Eggs to sender
@@ -107,13 +109,14 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
         uint256 sonic = EGGStoSONIC(eggs);
 
         // Burn of JAY
-        _burn(msg.sender, eggs);
+        uint256 feeAddressAmount = eggs / FEES_SELL;
+        _burn(msg.sender, eggs - feeAddressAmount);
 
         // Payment to sender
         sendSonic(msg.sender, (sonic * SELL_FEE) / FEE_BASE_1000);
 
         // Team fee
-        sendSonic(FEE_ADDRESS, sonic / FEES_SELL);
+        _transfer(msg.sender, FEE_ADDRESS, feeAddressAmount);
 
         safetyCheck(sonic);
     }
@@ -140,7 +143,10 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
             if (isLoanExpired(msg.sender)) {
                 delete Loans[msg.sender];
             }
-            require(Loans[msg.sender].borrowed == 0, "Use account w no loans");
+            require(
+                Loans[msg.sender].borrowed == 0,
+                "Use account with no loans"
+            );
         }
         uint256 endDate = getMidnightTimestamp(
             (numberOfDays * 1 days) + block.timestamp
@@ -155,18 +161,20 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
         uint256 userEggs = SONICtoEGGSLev(userSonic, subValue);
         uint256 eggsFee = SONICtoEGGSLev(sonicFee, subValue);
         mint(address(this), userEggs);
-        mint(FEE_ADDRESS, (eggsFee * 1) / 5);
+        mint(FEE_ADDRESS, (eggsFee * 100) / 333);
 
         addLoansByDate(userSonic, userEggs, endDate);
 
-        require(msg.value >= sonicFee, "hey");
+        require(msg.value >= sonicFee, "Insufficient sonic fee sent");
 
         Loans[msg.sender] = Loan({
             collateral: userEggs,
             borrowed: (userSonic * 99) / 100,
             endDate: endDate
         });
-
+        if (msg.value > sonicFee) {
+            sendSonic(msg.sender, msg.value - sonicFee);
+        }
         safetyCheck(sonic);
     }
 
@@ -180,8 +188,11 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
 
     function borrow(uint256 sonic, uint256 numberOfDays) public {
         liquidate();
-        require(numberOfDays < 366 && sonic > 0);
-
+        require(
+            numberOfDays < 366,
+            "Max borrow/extension must be 365 days or less"
+        );
+        require(sonic > 0, "Must borrow more than 0");
         if (isLoanExpired(msg.sender)) {
             delete Loans[msg.sender];
         }
@@ -208,15 +219,16 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
             sonicFee += additionalFee;
         }
 
-        require(sonic > sonicFee, "Hey");
+        require(sonic > sonicFee, "You must borrow more than the fee");
 
         uint256 userSonic = sonic - sonicFee;
         uint256 userEggs = SONICtoEGGSNoTrade(sonic);
         uint256 eggsFee = SONICtoEGGSNoTrade(sonicFee);
+        uint256 feeAddressFee = (eggsFee * 100) / 333;
 
         _transfer(msg.sender, address(this), userEggs);
-        _transfer(address(this), FEE_ADDRESS, (eggsFee * 2) / 5);
-        _burn(address(this), (eggsFee * 3) / 5);
+        _transfer(address(this), FEE_ADDRESS, feeAddressFee);
+        _burn(address(this), eggsFee - feeAddressFee);
 
         uint256 newUserBorrow = (userSonic * 99) / 100;
         sendSonic(msg.sender, newUserBorrow);
@@ -238,13 +250,13 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
         liquidate();
         uint256 collateral = Loans[msg.sender].collateral;
         require(
-            amount <= collateral && !isLoanExpired(msg.sender),
-            "you dont have enough tokens"
+            !isLoanExpired(msg.sender),
+            "Your loan has been liquidated, no collateral to remove"
         );
         require(
             Loans[msg.sender].borrowed <=
                 (EGGStoSONIC(collateral - amount) * 99) / 100,
-            ""
+            "Require 99% collateralization rate"
         );
         Loans[msg.sender].collateral -= amount;
         _transfer(address(this), msg.sender, amount);
@@ -257,7 +269,11 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
         liquidate();
         uint256 borrowed = Loans[msg.sender].borrowed;
         uint256 collateral = Loans[msg.sender].collateral;
-        require(!isLoanExpired(msg.sender) && borrowed == msg.value);
+        require(
+            !isLoanExpired(msg.sender),
+            "Your loan has been liquidated, no collateral to remove"
+        );
+        require(borrowed == msg.value, "Must return entire borrowed amount");
         _transfer(address(this), msg.sender, collateral);
         subLoansByDate(borrowed, collateral, Loans[msg.sender].endDate);
 
@@ -270,17 +286,25 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
         uint256 borrowedInEggs = SONICtoEGGSNoTrade(borrowed);
         uint256 collateral = Loans[msg.sender].collateral;
 
-        require(!isLoanExpired(msg.sender));
+        require(
+            !isLoanExpired(msg.sender),
+            "Your loan has been liquidated, no collateral to remove"
+        );
 
         uint256 collateralAfterFee = (collateral * 99) / 100;
         uint256 fee = collateral / 100;
-        require(collateralAfterFee >= borrowedInEggs, "OH no");
+        require(
+            collateralAfterFee >= borrowedInEggs,
+            "You do not have enough collateral to close position"
+        );
 
         uint256 toUser = collateralAfterFee - borrowedInEggs;
+        uint256 feeAddressFee = (fee * 100) / 333;
+
         _transfer(address(this), msg.sender, toUser);
-        _transfer(address(this), FEE_ADDRESS, fee / 3);
+        _transfer(address(this), FEE_ADDRESS, feeAddressFee);
         _burn(address(this), collateralAfterFee - toUser);
-        _burn(address(this), (fee * 2) / 3);
+        _burn(address(this), fee - feeAddressFee);
         subLoansByDate(borrowed, collateral, Loans[msg.sender].endDate);
 
         delete Loans[msg.sender];
@@ -297,7 +321,11 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
             oldEndDate + (numberOfDays * 1 days)
         );
         uint256 loanFee = getInterestFeeInEggs(borrowed, numberOfDays);
-        require(!isLoanExpired(msg.sender) && loanFee == msg.value);
+        require(
+            !isLoanExpired(msg.sender),
+            "Your loan has been liquidated, no collateral to remove"
+        );
+        require(loanFee == msg.value, "Loan extension fee incorrect");
 
         subLoansByDate(borrowed, collateral, oldEndDate);
         addLoansByDate(borrowed, collateral, newEndDate);
@@ -312,11 +340,12 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
         uint256 collateral;
 
         while (lastLiquidationDate < block.timestamp) {
-            lastLiquidationDate = lastLiquidationDate + 1 days;
             collateral += CollateralByDate[lastLiquidationDate];
             borrowed += BorrowedByDate[lastLiquidationDate];
+            lastLiquidationDate = lastLiquidationDate + 1 days;
         }
         if (collateral > 0) {
+            totalCollateral -= collateral;
             _burn(address(this), collateral);
         }
         if (borrowed > 0) {
@@ -400,9 +429,11 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
     function safetyCheck(uint256 soinc) private {
         uint256 newPrice = (getBacking() * 1 ether) / totalSupply();
         uint256 _totalColateral = balanceOf(address(this));
-        uint256 _totalBorrowed = getTotalBorrowed();
-        require(_totalColateral >= totalCollateral, "hey fuck you");
-        require(lastPrice <= newPrice, "heyy fuck you");
+        require(
+            _totalColateral >= totalCollateral,
+            "The eggs balance of the contract must be greater than or equal to the collateral"
+        );
+        require(lastPrice <= newPrice, "The price of eggs cannot decrease");
         lastPrice = newPrice;
         emit Price(block.timestamp, newPrice, soinc);
     }
@@ -443,8 +474,6 @@ contract EGGS is ERC20Burnable, Ownable, ReentrancyGuard {
             (getBacking()) /
             (FEE_BASE_1000);
     }
-
-    function deposit() public payable {}
 
     receive() external payable {}
 
