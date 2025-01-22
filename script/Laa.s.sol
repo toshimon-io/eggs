@@ -27,7 +27,7 @@ contract CounterScript is Script {
             .getLoanByAddress(0xbD5764D2b701D9A67756B570922db9ca09276a1a);
         console.log(borrowed2);*/
 
-        address target = 0xDbB8eb271cDA7e691FCc373E9D64A2F4F3bF9CdF;
+        address target = 0x0333902eABC3B6e090EFB5de5e317E572433174f;
         /*uint256 eggtotal = 1 * 10 ** 17;
         (uint256 collateral2, uint256 borrowed2, uint256 collateralcov2) = eggs
             .getLoanByAddress(0xbD5764D2b701D9A67756B570922db9ca09276a1a);

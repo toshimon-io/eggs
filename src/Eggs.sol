@@ -43,7 +43,16 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     event Price(uint256 time, uint256 price, uint256 volumeInSonic);
     event MaxUpdated(uint256 max);
     event SellFeeUpdated(uint256 sellFee);
+    event FeeAddressUpdated(address _address);
     event buyFeeUpdated(uint256 buyFee);
+    event Started(bool started);
+    event LoanDataUpdate(
+        uint256 collateralByDate,
+        uint256 borrowedByDate,
+        uint256 totalBorrowed,
+        uint256 totalCollateral
+    );
+    event SendSonic(address to, uint256 amount);
 
     constructor() payable ERC20("Eggs", "EGGS") Ownable(msg.sender) {
         lastLiquidationDate = getMidnightTimestamp(block.timestamp);
@@ -58,6 +67,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     }
     function setStart() public onlyOwner {
         start = true;
+        emit Started(true);
     }
 
     function mint(address to, uint256 value) private {
@@ -74,13 +84,12 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
             "Can't set fee address to 0x0 address"
         );
         FEE_ADDRESS = payable(_address);
+        emit FeeAddressUpdated(_address);
     }
 
     function setBuyFee(uint16 amount) external onlyOwner {
-        require(
-            amount <= 1000 && amount >= 990,
-            "buy fee must be in safe range"
-        );
+        require(amount <= 1000, "buy fee must be less 0% or more");
+        require(amount >= 990, "buy fee must be less than 1%");
         BUY_FEE = amount;
         emit buyFeeUpdated(amount);
     }
@@ -88,6 +97,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         liquidate();
         require(start, "Trading must be initialized");
         require(msg.value > MIN, "must trade over min");
+        require(reciever != address(0x0), "Reciever cannot be 0x0 address");
 
         // Mint Eggs to sender
         uint256 eggs = SONICtoEGGS(msg.value);
@@ -366,6 +376,12 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         BorrowedByDate[date] = BorrowedByDate[date] + borrowed;
         totalBorrowed = totalBorrowed + borrowed;
         totalCollateral = totalCollateral + collateral;
+        emit LoanDataUpdate(
+            CollateralByDate[date],
+            BorrowedByDate[date],
+            totalBorrowed,
+            totalCollateral
+        );
     }
     function subLoansByDate(
         uint256 borrowed,
@@ -376,6 +392,12 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         BorrowedByDate[date] = BorrowedByDate[date] - borrowed;
         totalBorrowed = totalBorrowed - borrowed;
         totalCollateral = totalCollateral - collateral;
+        emit LoanDataUpdate(
+            CollateralByDate[date],
+            BorrowedByDate[date],
+            totalBorrowed,
+            totalCollateral
+        );
     }
 
     // utility fxns
@@ -468,6 +490,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     function sendSonic(address _address, uint256 _value) internal {
         (bool success, ) = _address.call{value: _value}("");
         require(success, "SONIC Transfer failed.");
+        emit SendSonic(_address, _value);
     }
 
     //utils
