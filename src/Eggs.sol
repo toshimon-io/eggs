@@ -416,7 +416,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         Loans[msg.sender].endDate = newEndDate;
         Loans[msg.sender].numberOfDays = numberOfDays + _numberOfDays;
         require(
-            Loans[msg.sender].numberOfDays < 366,
+            newEndDate - oldEndDate / 1 days < 366,
             "Loan must be under 365 days"
         );
 
