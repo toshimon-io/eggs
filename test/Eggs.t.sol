@@ -16,10 +16,44 @@ contract EggsTest is Test {
     }
 
     function setUp() public {
-        eggs = new EGGS{value: 1000 * 10e18}();
+        eggs = new EGGS{value: 0.01 ether}();
+        uint256 nal = address(eggs).balance;
+        console.log(nal);
         eggs.setStart();
         eggs.setFeeAddress(msg.sender);
-        console.log(address(eggs));
+
+        eggs.buy{value: 0.01 ether}(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
+        nal = address(eggs).balance;
+        console.log(nal);
+    }
+    function test_BorrowAndRepay() public {
+        uint256 val = eggs.EGGStoSONIC(eggs.balanceOf(msg.sender)); // -
+        uint256 nal = address(eggs).balance;
+        console.log(val);
+        console.log(nal);
+        eggs.borrow(val, 0);
+        (uint256 cday1, uint day1) = eggs.getLoansExpiringByDate(
+            block.timestamp
+        );
+        (
+            uint256 collateral,
+            uint256 borrowed,
+            uint256 end,
+            uint256 daysmount
+        ) = eggs.Loans(msg.sender);
+        assertEq(collateral, cday1);
+        assertEq(borrowed, day1);
+
+        eggs.flashClosePosition();
+
+        (uint256 cday2, uint day2) = eggs.getLoansExpiringByDate(
+            block.timestamp
+        );
+        assertEq(cday2, 0);
+        assertEq(day2, 0);
+
+        /*eggs.buy{value: 7780962683658298567970046477}(msg.sender);
+        assertEq(eggs.totalSupply(), 190000000000000000000000);*/
     }
 
     function test_Increment() public {

@@ -33,6 +33,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 collateral; // shares of token staked
         uint256 borrowed; // user reward per token paid
         uint256 endDate;
+        uint256 numberOfDays;
     }
 
     mapping(address => Loan) public Loans;
@@ -46,6 +47,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     event FeeAddressUpdated(address _address);
     event buyFeeUpdated(uint256 buyFee);
     event Started(bool started);
+    event Liquidate(uint256 time, uint256 amount);
     event LoanDataUpdate(
         uint256 collateralByDate,
         uint256 borrowedByDate,
@@ -96,7 +98,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     function buy(address reciever) external payable nonReentrant {
         liquidate();
         require(start, "Trading must be initialized");
-        require(msg.value > MIN, "must trade over min");
+
         require(reciever != address(0x0), "Reciever cannot be 0x0 address");
 
         // Mint Eggs to sender
@@ -105,26 +107,28 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         mint(reciever, (eggs * getBuyFee()) / FEE_BASE_1000);
 
         // Team fee
-        mint(FEE_ADDRESS, eggs / FEES_BUY);
+        uint256 feeAddressAmount = msg.value / FEES_BUY;
+        require(feeAddressAmount > MIN, "must trade over min");
 
         safetyCheck(msg.value);
     }
     function sell(uint256 eggs) external nonReentrant {
-        require(eggs > MIN, "must trade over min");
         liquidate();
 
         // Total Eth to be sent
         uint256 sonic = EGGStoSONIC(eggs);
 
         // Burn of JAY
-        uint256 feeAddressAmount = eggs / FEES_SELL;
-        _burn(msg.sender, eggs - feeAddressAmount);
+        uint256 feeAddressAmount = sonic / FEES_SELL;
+        _burn(msg.sender, eggs);
 
         // Payment to sender
         sendSonic(msg.sender, (sonic * SELL_FEE) / FEE_BASE_1000);
 
         // Team fee
-        _transfer(msg.sender, FEE_ADDRESS, feeAddressAmount);
+
+        require(feeAddressAmount > MIN, "must trade over min");
+        sendSonic(FEE_ADDRESS, feeAddressAmount);
 
         safetyCheck(sonic);
     }
@@ -167,25 +171,33 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         uint256 userSonic = sonic - sonicFee;
 
-        uint256 subValue = (sonicFee * 1) / 5;
-
+        uint256 subValue = ((sonicFee * 3) / 10) + (userSonic / 100);
+        uint256 totalFee = (sonicFee + userSonic / 100);
+        uint256 feeOverage;
+        if (msg.value > totalFee) {
+            feeOverage = msg.value - totalFee;
+            sendSonic(msg.sender, feeOverage);
+        }
+        require(
+            msg.value - feeOverage == totalFee,
+            "Insufficient sonic fee sent"
+        );
         uint256 userEggs = SONICtoEGGSLev(userSonic, subValue);
-        uint256 eggsFee = SONICtoEGGSLev(sonicFee, subValue);
         mint(address(this), userEggs);
-        mint(FEE_ADDRESS, (eggsFee * 100) / 333);
+        uint256 feeAddressAmount = (sonicFee * 3) / 10;
+        require(feeAddressAmount > MIN, "Fees must be higher than min.");
+        sendSonic(FEE_ADDRESS, feeAddressAmount);
 
-        addLoansByDate(userSonic, userEggs, endDate);
+        uint256 userBorrow = (userSonic * 99) / 100;
 
-        require(msg.value >= sonicFee, "Insufficient sonic fee sent");
-
+        addLoansByDate(userBorrow, userEggs, endDate);
         Loans[msg.sender] = Loan({
             collateral: userEggs,
-            borrowed: (userSonic * 99) / 100,
-            endDate: endDate
+            borrowed: userBorrow,
+            endDate: endDate,
+            numberOfDays: numberOfDays
         });
-        if (msg.value > sonicFee) {
-            sendSonic(msg.sender, msg.value - sonicFee);
-        }
+
         safetyCheck(sonic);
     }
 
@@ -207,51 +219,90 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         if (isLoanExpired(msg.sender)) {
             delete Loans[msg.sender];
         }
-
+        require(
+            Loans[msg.sender].borrowed == 0,
+            "Use borrowMore to borrow more"
+        );
         uint256 endDate = getMidnightTimestamp(
             (numberOfDays * 1 days) + block.timestamp
         );
 
         uint256 sonicFee = getInterestFeeInEggs(sonic, numberOfDays);
 
-        uint256 userBorrowed = Loans[msg.sender].borrowed;
-        uint256 userCollateral = Loans[msg.sender].collateral;
+        uint256 feeAddressFee = (sonicFee * 3) / 10;
 
-        if (userBorrowed != 0) {
-            uint256 userEndDate = Loans[msg.sender].endDate;
-
-            require(endDate >= userEndDate, "Cant decrease loan length");
-
-            subLoansByDate(userBorrowed, userCollateral, userEndDate);
-            uint256 additionalFee = getInterestFeeInEggs(
-                userBorrowed,
-                (endDate - userEndDate) / 1 days
-            );
-            sonicFee = sonicFee + additionalFee;
-        }
-
-        require(sonic > sonicFee, "You must borrow more than the fee");
-
-        uint256 userSonic = sonic - sonicFee;
         uint256 userEggs = SONICtoEGGSNoTrade(sonic);
-        uint256 eggsFee = SONICtoEGGSNoTrade(sonicFee);
-        uint256 feeAddressFee = (eggsFee * 100) / 333;
-
         _transfer(msg.sender, address(this), userEggs);
-        _transfer(address(this), FEE_ADDRESS, feeAddressFee);
-        _burn(address(this), eggsFee - feeAddressFee);
+        require(feeAddressFee > MIN, "Fees must be higher than min.");
 
-        uint256 newUserBorrow = (userSonic * 99) / 100;
-        sendSonic(msg.sender, newUserBorrow);
+        uint256 newUserBorrow = (sonic * 99) / 100;
 
-        uint256 newUserCollateral = userEggs - eggsFee + userCollateral;
-        uint256 newUserBorrowTotal = newUserBorrow + userBorrowed;
-        addLoansByDate(newUserBorrowTotal, newUserCollateral, endDate);
+        sendSonic(msg.sender, newUserBorrow - sonicFee);
+        sendSonic(FEE_ADDRESS, feeAddressFee);
+
+        addLoansByDate(newUserBorrow, userEggs, endDate);
 
         Loans[msg.sender] = Loan({
-            collateral: newUserCollateral,
+            collateral: userEggs,
+            borrowed: newUserBorrow,
+            endDate: endDate,
+            numberOfDays: numberOfDays
+        });
+
+        safetyCheck(sonicFee);
+    }
+    function borrowMore(uint256 sonic) public {
+        liquidate();
+        require(!isLoanExpired(msg.sender), "Loan expired use borrow");
+        require(sonic != 0, "Must borrow more than 0");
+
+        uint256 userBorrowed = Loans[msg.sender].borrowed;
+        uint256 userCollateral = Loans[msg.sender].collateral;
+        uint256 userEndDate = Loans[msg.sender].endDate;
+
+        uint256 todayMidnight = getMidnightTimestamp(block.timestamp);
+        uint256 newBorrowLength = (userEndDate - todayMidnight) / 1 days;
+
+        uint256 sonicFee = getInterestFeeInEggs(sonic, newBorrowLength);
+
+        uint256 userEggs = SONICtoEGGSNoTrade(sonic);
+        uint256 userBorrowedInEggs = SONICtoEGGSNoTrade(userBorrowed);
+        uint256 userExcessInEggs = ((userCollateral) * 99) /
+            100 -
+            userBorrowedInEggs;
+
+        uint256 requireCollateralFromUser = userEggs;
+        if (userExcessInEggs >= userEggs) {
+            requireCollateralFromUser = 0;
+        } else {
+            requireCollateralFromUser =
+                requireCollateralFromUser -
+                userExcessInEggs;
+        }
+
+        if (requireCollateralFromUser != 0) {
+            _transfer(msg.sender, address(this), requireCollateralFromUser);
+        }
+
+        uint256 feeAddressFee = (sonicFee * 3) / 10;
+
+        uint256 newUserBorrow = (sonic * 99) / 100;
+
+        uint256 newUserBorrowTotal = userBorrowed + newUserBorrow;
+        uint256 newUserCollateralTotal = userCollateral +
+            requireCollateralFromUser;
+
+        require(feeAddressFee > MIN, "Fees must be higher than min.");
+        sendSonic(FEE_ADDRESS, feeAddressFee);
+        sendSonic(msg.sender, newUserBorrow - sonicFee);
+
+        addLoansByDate(newUserBorrow, requireCollateralFromUser, userEndDate);
+
+        Loans[msg.sender] = Loan({
+            collateral: newUserCollateralTotal,
             borrowed: newUserBorrowTotal,
-            endDate: endDate
+            endDate: userEndDate,
+            numberOfDays: newBorrowLength
         });
 
         safetyCheck(sonicFee);
@@ -275,7 +326,23 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         safetyCheck(0);
     }
+    function repay() public payable nonReentrant {
+        liquidate();
 
+        uint256 borrowed = Loans[msg.sender].borrowed;
+        require(borrowed > msg.value, "Must repay less than borrowed amount");
+        require(msg.value != 0, "Must repay something");
+
+        require(
+            !isLoanExpired(msg.sender),
+            "Your loan has been liquidated, cannot repay"
+        );
+        uint256 newBorrow = borrowed - msg.value;
+        Loans[msg.sender].borrowed - newBorrow;
+        subLoansByDate(msg.value, 0, Loans[msg.sender].endDate);
+
+        safetyCheck(0);
+    }
     function closePosition() public payable nonReentrant {
         liquidate();
         uint256 borrowed = Loans[msg.sender].borrowed;
@@ -294,28 +361,30 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     function flashClosePosition() public nonReentrant {
         liquidate();
         uint256 borrowed = Loans[msg.sender].borrowed;
-        uint256 borrowedInEggs = SONICtoEGGSNoTrade(borrowed);
-        uint256 collateral = Loans[msg.sender].collateral;
 
+        uint256 collateral = Loans[msg.sender].collateral;
+        uint256 collateralInSonic = EGGStoSONIC(collateral);
+        _burn(address(this), collateral);
         require(
             !isLoanExpired(msg.sender),
             "Your loan has been liquidated, no collateral to remove"
         );
 
-        uint256 collateralAfterFee = (collateral * 99) / 100;
-        uint256 fee = collateral / 100;
+        uint256 collateralInSonicAfterFee = (collateralInSonic * 99) / 100;
+
+        uint256 fee = collateralInSonic / 100;
         require(
-            collateralAfterFee >= borrowedInEggs,
+            collateralInSonicAfterFee >= borrowed,
             "You do not have enough collateral to close position"
         );
 
-        uint256 toUser = collateralAfterFee - borrowedInEggs;
-        uint256 feeAddressFee = (fee * 100) / 333;
+        uint256 toUser = collateralInSonicAfterFee - borrowed;
+        uint256 feeAddressFee = (fee * 3) / 10;
 
-        _transfer(address(this), msg.sender, toUser);
-        _transfer(address(this), FEE_ADDRESS, feeAddressFee);
-        _burn(address(this), collateralAfterFee - toUser);
-        _burn(address(this), fee - feeAddressFee);
+        sendSonic(msg.sender, toUser);
+
+        require(feeAddressFee > MIN, "Fees must be higher than min.");
+        sendSonic(FEE_ADDRESS, feeAddressFee);
         subLoansByDate(borrowed, collateral, Loans[msg.sender].endDate);
 
         delete Loans[msg.sender];
@@ -329,20 +398,23 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 oldEndDate = Loans[msg.sender].endDate;
         uint256 borrowed = Loans[msg.sender].borrowed;
         uint256 collateral = Loans[msg.sender].collateral;
+        uint256 _numberOfDays = Loans[msg.sender].numberOfDays;
 
-        uint256 newEndDate = getMidnightTimestamp(
-            oldEndDate + (numberOfDays * 1 days)
-        );
+        uint256 newEndDate = oldEndDate + (numberOfDays * 1 days);
+
         uint256 loanFee = getInterestFeeInEggs(borrowed, numberOfDays);
         require(
             !isLoanExpired(msg.sender),
             "Your loan has been liquidated, no collateral to remove"
         );
         require(loanFee == msg.value, "Loan extension fee incorrect");
-
+        uint256 feeAddressFee = (loanFee * 3) / 10;
+        require(feeAddressFee > MIN, "Fees must be higher than min.");
+        sendSonic(FEE_ADDRESS, feeAddressFee);
         subLoansByDate(borrowed, collateral, oldEndDate);
         addLoansByDate(borrowed, collateral, newEndDate);
         Loans[msg.sender].endDate = newEndDate;
+        Loans[msg.sender].numberOfDays = numberOfDays + _numberOfDays;
 
         safetyCheck(msg.value);
         return loanFee;
@@ -363,7 +435,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         }
         if (borrowed != 0) {
             totalBorrowed = totalBorrowed - borrowed;
-            safetyCheck(borrowed);
+            emit Liquidate(lastLiquidationDate - 1 days, borrowed);
         }
     }
 
@@ -481,6 +553,12 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 fee
     ) public view returns (uint256) {
         return (value * totalSupply()) / (getBacking() - fee);
+    }
+    function SONICtoEGGSBorrow(
+        uint256 value,
+        uint256 fee
+    ) public view returns (uint256) {
+        return (value * totalSupply()) / (getBacking() + fee);
     }
 
     function SONICtoEGGSNoTrade(uint256 value) public view returns (uint256) {

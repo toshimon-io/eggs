@@ -12,7 +12,7 @@ contract CounterScript is Script {
     function run() public {
         vm.startBroadcast();
         eggs = new EGGS{value: 0.01 ether}();
-        eggs.setFeeAddress(msg.sender);
+        eggs.setFeeAddress(0x38818e389773445Cd73aDBAA37B8B169F458c6e1);
         eggs.setStart();
 
         uint256 eggtotal = 1000 * 10 ** 18;
