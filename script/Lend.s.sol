@@ -15,7 +15,7 @@ contract CounterScript is Script {
     }
 
     EGGS public eggs =
-        EGGS(payable(0x9A940EF65F8bF33332aA4fAEa921454828F0C80a));
+        EGGS(payable(0xcf440B3a823449ec0D9B413BD183a81e44dA5441));
     //0x5Eb9cC76c3506942c1c0Ead70e877dD5e4f00cb0
 
     function setUp() public {}
@@ -111,7 +111,9 @@ contract CounterScript is Script {
         console.log(q2);
         console.log(vall);
         console.log(val);
-        //eggs.borrow(val, 0);
+        uint256 _fee = eggs.getInterestFeeInEggs(borrowed2, 365);
+        eggs.extendLoan{value: _fee}(365);
+        //  eggs.borrow(val, 0);
         //eggs.borrowMore(vall + val);
         // eggs.flashClosePosition();
         //eggs.flashClosePosition();
@@ -137,8 +139,7 @@ contract CounterScript is Script {
         // eggs.closePosition{value: borrowed}();
         uint256 aaaa = eggs.EGGStoSONIC(collateral);
 
-        uint256 _fee = eggs.getInterestFeeInEggs(borrowed, 1);
-        // uint256 __fee = eggs.extendLoan{value: _fee}(1);
+  
         console.log(_fee);
         //  console.log(__fee);
         uint256 rng1 = getRandomNumber(block.timestamp);
