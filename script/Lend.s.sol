@@ -63,15 +63,16 @@ contract CounterScript is Script {
         console.log(cday3, day3);
         console.log(cday4, day4);
         uint256 borrowed3 = eggs.SONICtoEGGSNoTrade(borrowed2);
-        uint256 collateral3 = (collateral2 * 99) / 100;
-        console.log(borrowed3, collateral3);
+        uint256 collateral3 = (eggs.EGGStoSONIC(collateral2) * 99) / 100;
+        console.log(borrowed2);
+        console.log(collateral3);
 
         //console.log((priceAfterBomb * 100) / amt2);
         //eggs.setFeeAddress(0x04fE38cbE12227a4AB51B78b6F801F1C4C7c3E58);
         if (bal > 10000) {
             // eggs.sell(eggs.balanceOf(msg.sender));
         }
-        // eggs.buy{value: 10000000000000000}(msg.sender);
+        eggs.buy{value: 10000000000000000}(msg.sender);
         //}
 
         //eggs.setFeeAddress(msg.sender);
@@ -95,7 +96,7 @@ contract CounterScript is Script {
         vm.startBroadcast();
         */
 
-        uint256 q = eggs.getTotalBorrowed();
+        uint256 q = eggs.balanceOf(msg.sender);
         uint256 q2 = eggs.getTotalCollateral();
 
         uint256 _bal = collateral2;
@@ -111,8 +112,8 @@ contract CounterScript is Script {
         console.log(vall);
         console.log(val);
         //eggs.borrow(val, 0);
-        // eggs.borrowMore(vall + val);
-        //eggs.flashClosePosition();
+        //eggs.borrowMore(vall + val);
+        // eggs.flashClosePosition();
         //eggs.flashClosePosition();
         // uint256 tob = eggs.getTotalBorrowed();
         //console.log(tob);
@@ -125,7 +126,7 @@ contract CounterScript is Script {
         uint256 _totalBorrowed = eggs.getTotalCollateral();
         console.log(_totalBorrowed);
 
-        //eggs.liquidate();
+        eggs.liquidate();
         //  eggs.leverage{value: val2}(eggsTotal, 0);
 
         /*
