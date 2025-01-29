@@ -102,7 +102,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         require(reciever != address(0x0), "Reciever cannot be 0x0 address");
 
         // Mint Eggs to sender
-        uint256 eggs = SONICtoEGGSLev(msg.value);
+        uint256 eggs = SONICtoEGGS(msg.value);
 
         mint(reciever, (eggs * getBuyFee()) / FEE_BASE_1000);
 
