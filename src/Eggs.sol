@@ -11,11 +11,11 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     uint256 private constant MIN = 1000;
 
     uint16 public SELL_FEE = 975;
-    uint16 public BUY_FEE = 990;
+    uint16 public BUY_FEE = 975;
     uint16 public BUY_FEE_REVERSE = 10;
     uint16 private constant FEE_BASE_1000 = 1000;
 
-    uint16 private constant FEES_BUY = 333;
+    uint16 private constant FEES_BUY = 125;
     uint16 private constant FEES_SELL = 125;
 
     bool public start = false;
@@ -91,7 +91,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
     function setBuyFee(uint16 amount) external onlyOwner {
         require(amount <= 1000, "buy fee must be less 0% or more");
-        require(amount >= 990, "buy fee must be less than 1%");
+        require(amount >= 975, "buy fee must be less than 2.5%");
         BUY_FEE = amount;
         emit buyFeeUpdated(amount);
     }
