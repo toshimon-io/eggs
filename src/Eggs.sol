@@ -252,15 +252,8 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 feeAddressFee = (sonicFee * 3) / 10;
 
         uint256 userEggs = SONICtoEGGSNoTrade(sonic);
-        _transfer(msg.sender, address(this), userEggs);
-        require(feeAddressFee > MIN, "Fees must be higher than min.");
 
         uint256 newUserBorrow = (sonic * 99) / 100;
-
-        sendSonic(msg.sender, newUserBorrow - sonicFee);
-        sendSonic(FEE_ADDRESS, feeAddressFee);
-
-        addLoansByDate(newUserBorrow, userEggs, endDate);
 
         Loans[msg.sender] = Loan({
             collateral: userEggs,
@@ -268,6 +261,14 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
             endDate: endDate,
             numberOfDays: numberOfDays
         });
+
+        _transfer(msg.sender, address(this), userEggs);
+        require(feeAddressFee > MIN, "Fees must be higher than min.");
+
+        sendSonic(msg.sender, newUserBorrow - sonicFee);
+        sendSonic(FEE_ADDRESS, feeAddressFee);
+
+        addLoansByDate(newUserBorrow, userEggs, endDate);
 
         safetyCheck(sonicFee);
     }
@@ -300,10 +301,6 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
                 userExcessInEggs;
         }
 
-        if (requireCollateralFromUser != 0) {
-            _transfer(msg.sender, address(this), requireCollateralFromUser);
-        }
-
         uint256 feeAddressFee = (sonicFee * 3) / 10;
 
         uint256 newUserBorrow = (sonic * 99) / 100;
@@ -312,18 +309,22 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 newUserCollateralTotal = userCollateral +
             requireCollateralFromUser;
 
-        require(feeAddressFee > MIN, "Fees must be higher than min.");
-        sendSonic(FEE_ADDRESS, feeAddressFee);
-        sendSonic(msg.sender, newUserBorrow - sonicFee);
-
-        addLoansByDate(newUserBorrow, requireCollateralFromUser, userEndDate);
-
         Loans[msg.sender] = Loan({
             collateral: newUserCollateralTotal,
             borrowed: newUserBorrowTotal,
             endDate: userEndDate,
             numberOfDays: newBorrowLength
         });
+
+        if (requireCollateralFromUser != 0) {
+            _transfer(msg.sender, address(this), requireCollateralFromUser);
+        }
+
+        require(feeAddressFee > MIN, "Fees must be higher than min.");
+        sendSonic(FEE_ADDRESS, feeAddressFee);
+        sendSonic(msg.sender, newUserBorrow - sonicFee);
+
+        addLoansByDate(newUserBorrow, requireCollateralFromUser, userEndDate);
 
         safetyCheck(sonicFee);
     }
