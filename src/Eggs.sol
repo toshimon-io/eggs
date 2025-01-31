@@ -116,16 +116,16 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         sell_fee = amount;
         emit buyFeeUpdated(amount);
     }
-    function buy(address reciever) external payable nonReentrant {
+    function buy(address receiver) external payable nonReentrant {
         liquidate();
         require(start, "Trading must be initialized");
 
-        require(reciever != address(0x0), "Reciever cannot be 0x0 address");
+        require(receiver != address(0x0), "Reciever cannot be 0x0 address");
 
         // Mint Eggs to sender
         uint256 eggs = SONICtoEGGS(msg.value);
 
-        mint(reciever, (eggs * getBuyFee()) / FEE_BASE_1000);
+        mint(receiver, (eggs * getBuyFee()) / FEE_BASE_1000);
 
         // Team fee
         uint256 feeAddressAmount = msg.value / FEES_BUY;
