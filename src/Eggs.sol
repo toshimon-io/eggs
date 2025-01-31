@@ -91,9 +91,27 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     }
 
     function setBuyFee(uint16 amount) external onlyOwner {
-        require(amount <= 1000, "buy fee must be less 0% or more");
+        require(
+            amount <= 1000 - FEES_BUY,
+            "buy fee must be greater than FEES_BUY"
+        );
         require(amount >= 975, "buy fee must be less than 2.5%");
         BUY_FEE = amount;
+        emit buyFeeUpdated(amount);
+    }
+    function setBuyReserveFee(uint16 amount) external onlyOwner {
+        require(amount <= 25, "buy reserve fee must be less 0% or more");
+        require(amount >= 0, "buy fee must be less than 2.5%");
+        BUY_FEE_REVERSE = amount;
+        emit buyFeeUpdated(amount);
+    }
+    function setSellFee(uint16 amount) external onlyOwner {
+        require(
+            amount <= 1000 - FEES_SELL,
+            "sell fee must be greater than SELL_FEE"
+        );
+        require(amount >= 975, "sell fee must be less than 2.5%");
+        SELL_FEE = amount;
         emit buyFeeUpdated(amount);
     }
     function buy(address reciever) external payable nonReentrant {
