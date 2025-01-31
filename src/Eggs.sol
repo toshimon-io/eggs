@@ -10,9 +10,9 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
     uint256 private constant MIN = 1000;
 
-    uint16 public SELL_FEE = 975;
-    uint16 public BUY_FEE = 975;
-    uint16 public BUY_FEE_REVERSE = 10;
+    uint16 public sell_fee = 975;
+    uint16 public buy_fee = 975;
+    uint16 public buy_fee_leverage = 10;
     uint16 private constant FEE_BASE_1000 = 1000;
 
     uint16 private constant FEES_BUY = 125;
@@ -96,22 +96,22 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
             "buy fee must be greater than FEES_BUY"
         );
         require(amount >= 975, "buy fee must be less than 2.5%");
-        BUY_FEE = amount;
+        buy_fee = amount;
         emit buyFeeUpdated(amount);
     }
-    function setBuyReserveFee(uint16 amount) external onlyOwner {
-        require(amount <= 25, "buy reserve fee must be less 0% or more");
-        require(amount >= 0, "buy fee must be less than 2.5%");
-        BUY_FEE_REVERSE = amount;
+    function setBuyFeeLeverage(uint16 amount) external onlyOwner {
+        require(amount <= 25, "leverage buy fee must be less 2.5%");
+        require(amount >= 0, "leverage buy fee must be greater than 0%");
+        buy_fee_leverage = amount;
         emit buyFeeUpdated(amount);
     }
     function setSellFee(uint16 amount) external onlyOwner {
         require(
             amount <= 1000 - FEES_SELL,
-            "sell fee must be greater than SELL_FEE"
+            "sell fee must be greater than FEES_SELL"
         );
         require(amount >= 975, "sell fee must be less than 2.5%");
-        SELL_FEE = amount;
+        sell_fee = amount;
         emit buyFeeUpdated(amount);
     }
     function buy(address reciever) external payable nonReentrant {
@@ -143,7 +143,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         _burn(msg.sender, eggs);
 
         // Payment to sender
-        sendSonic(msg.sender, (sonic * SELL_FEE) / FEE_BASE_1000);
+        sendSonic(msg.sender, (sonic * sell_fee) / FEE_BASE_1000);
 
         // Team fee
 
@@ -160,7 +160,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 sonic,
         uint256 numberOfDays
     ) public view returns (uint256) {
-        uint256 mintFee = (sonic * BUY_FEE_REVERSE) / FEE_BASE_1000;
+        uint256 mintFee = (sonic * buy_fee_leverage) / FEE_BASE_1000;
 
         uint256 interest = getInterestFeeInEggs(sonic, numberOfDays);
 
@@ -530,7 +530,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     }
 
     function getBuyFee() public view returns (uint256) {
-        return BUY_FEE;
+        return buy_fee;
     }
 
     // Buy Eggs
@@ -598,7 +598,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     //utils
     function getBuyEggs(uint256 amount) external view returns (uint256) {
         return
-            (amount * (totalSupply()) * (BUY_FEE)) /
+            (amount * (totalSupply()) * (buy_fee)) /
             (getBacking()) /
             (FEE_BASE_1000);
     }
