@@ -58,11 +58,13 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
     constructor() payable ERC20("Eggs", "EGGS") Ownable(msg.sender) {
         lastLiquidationDate = getMidnightTimestamp(block.timestamp);
-        mint(msg.sender, msg.value * MIN);
-        mint(address(this), 10000);
+
+        uint256 teamMint = msg.value * MIN;
+        require(teamMint >= 10000);
+        mint(msg.sender, teamMint);
 
         _transfer(
-            address(this),
+            msg.sender,
             0x000000000000000000000000000000000000dEaD,
             10000
         );
