@@ -68,6 +68,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         );
     }
     function setStart() public onlyOwner {
+        require(FEE_ADDRESS != address(0x0), "Must set fee address");
         start = true;
         emit Started(true);
     }
@@ -138,12 +139,12 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         return ((eggs * getBuyFee()) / FEE_BASE_1000);
     }
     function leverageFee(
-        uint256 eggs,
+        uint256 sonic,
         uint256 numberOfDays
     ) public view returns (uint256) {
-        uint256 mintFee = (eggs * BUY_FEE_REVERSE) / FEE_BASE_1000;
+        uint256 mintFee = (sonic * BUY_FEE_REVERSE) / FEE_BASE_1000;
 
-        uint256 interest = getInterestFeeInEggs(eggs, numberOfDays);
+        uint256 interest = getInterestFeeInEggs(sonic, numberOfDays);
 
         return (mintFee + interest);
     }
@@ -210,7 +211,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         return ((amount * interest) / 100 / FEE_BASE_1000);
     }
 
-    function borrow(uint256 sonic, uint256 numberOfDays) public {
+    function borrow(uint256 sonic, uint256 numberOfDays) public nonReentrant {
         liquidate();
         require(
             numberOfDays < 366,
@@ -252,7 +253,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         safetyCheck(sonicFee);
     }
-    function borrowMore(uint256 sonic) public {
+    function borrowMore(uint256 sonic) public nonReentrant {
         liquidate();
         require(!isLoanExpired(msg.sender), "Loan expired use borrow");
         require(sonic != 0, "Must borrow more than 0");
@@ -339,7 +340,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
             "Your loan has been liquidated, cannot repay"
         );
         uint256 newBorrow = borrowed - msg.value;
-        Loans[msg.sender].borrowed - newBorrow;
+        Loans[msg.sender].borrowed = newBorrow;
         subLoansByDate(msg.value, 0, Loans[msg.sender].endDate);
 
         safetyCheck(0);
@@ -528,7 +529,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         return address(this).balance + getTotalBorrowed();
     }
 
-    function safetyCheck(uint256 soinc) private {
+    function safetyCheck(uint256 sonic) private {
         uint256 newPrice = (getBacking() * 1 ether) / totalSupply();
         uint256 _totalColateral = balanceOf(address(this));
         require(
@@ -537,7 +538,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         );
         require(lastPrice <= newPrice, "The price of eggs cannot decrease");
         lastPrice = newPrice;
-        emit Price(block.timestamp, newPrice, soinc);
+        emit Price(block.timestamp, newPrice, sonic);
     }
     function EGGStoSONICLev(
         uint256 value,
