@@ -173,6 +173,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 sonic,
         uint256 numberOfDays
     ) public payable nonReentrant {
+        require(start, "Trading must be initialized");
         liquidate();
 
         Loan memory userLoan = Loans[msg.sender];
