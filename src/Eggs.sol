@@ -94,7 +94,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
     function setBuyFee(uint16 amount) external onlyOwner {
         require(
-            amount <= 1000 - FEES_BUY,
+            amount <= 992 - FEES_BUY,
             "buy fee must be greater than FEES_BUY"
         );
         require(amount >= 975, "buy fee must be less than 2.5%");
@@ -108,10 +108,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         emit buyFeeUpdated(amount);
     }
     function setSellFee(uint16 amount) external onlyOwner {
-        require(
-            amount <= 1000 - FEES_SELL,
-            "sell fee must be greater than FEES_SELL"
-        );
+        require(amount <= 992, "sell fee must be greater than FEES_SELL");
         require(amount >= 975, "sell fee must be less than 2.5%");
         sell_fee = amount;
         emit buyFeeUpdated(amount);
@@ -164,7 +161,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     ) public view returns (uint256) {
         uint256 mintFee = (sonic * buy_fee_leverage) / FEE_BASE_1000;
 
-        uint256 interest = getInterestFeeInEggs(sonic, numberOfDays);
+        uint256 interest = getInterestFee(sonic, numberOfDays);
 
         return (mintFee + interest);
     }
@@ -224,7 +221,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         safetyCheck(sonic);
     }
 
-    function getInterestFeeInEggs(
+    function getInterestFee(
         uint256 amount,
         uint256 numberOfDays
     ) public pure returns (uint256) {
@@ -250,7 +247,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
             (numberOfDays * 1 days) + block.timestamp
         );
 
-        uint256 sonicFee = getInterestFeeInEggs(sonic, numberOfDays);
+        uint256 sonicFee = getInterestFee(sonic, numberOfDays);
 
         uint256 feeAddressFee = (sonicFee * 3) / 10;
 
@@ -287,7 +284,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 todayMidnight = getMidnightTimestamp(block.timestamp);
         uint256 newBorrowLength = (userEndDate - todayMidnight) / 1 days;
 
-        uint256 sonicFee = getInterestFeeInEggs(sonic, newBorrowLength);
+        uint256 sonicFee = getInterestFee(sonic, newBorrowLength);
 
         uint256 userEggs = SONICtoEGGSNoTrade(sonic);
         uint256 userBorrowedInEggs = SONICtoEGGSNoTrade(userBorrowed);
@@ -426,7 +423,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         uint256 newEndDate = oldEndDate + (numberOfDays * 1 days);
 
-        uint256 loanFee = getInterestFeeInEggs(borrowed, numberOfDays);
+        uint256 loanFee = getInterestFee(borrowed, numberOfDays);
         require(
             !isLoanExpired(msg.sender),
             "Your loan has been liquidated, no collateral to remove"
