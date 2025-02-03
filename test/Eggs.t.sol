@@ -22,7 +22,7 @@ contract EggsTest is Test {
         eggs.setStart();
         eggs.setFeeAddress(msg.sender);
 
-        eggs.buy{value: 0.01 ether}(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
+        eggs.buy{value: 0.1 ether}(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
         nal = address(eggs).balance;
         console.log(nal);
     }

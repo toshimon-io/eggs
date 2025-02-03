@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
 import {EGGS} from "../src/Eggs.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract CounterScript is Script {
     function getRandomNumber(uint256 seed) public view returns (uint) {
@@ -15,7 +16,7 @@ contract CounterScript is Script {
     }
 
     EGGS public eggs =
-        EGGS(payable(0xcf440B3a823449ec0D9B413BD183a81e44dA5441));
+        EGGS(payable(0xA5Db4118D356a559a8541Bf4cd43e9efDcbB8cAc));
     //0x5Eb9cC76c3506942c1c0Ead70e877dD5e4f00cb0
 
     function setUp() public {}
@@ -32,9 +33,11 @@ contract CounterScript is Script {
         ) = eggs.Loans(msg.sender);
 
         //eggs.sell(eggs.balanceOf(msg.sender));
-        uint256 bal = eggs.balanceOf(msg.sender);
+        uint256 bal = eggs.balanceOf(
+            0x65DB4FB0690ad454bb00836dEE432AE0549C30Df
+        );
         uint256 bal2 = eggs.balanceOf(
-            0x8AAFD3ede9AdB0Ff97C7AEbCe82a919AFb1C8764
+            0x65DB4FB0690ad454bb00836dEE432AE0549C30Df
         );
 
         uint256 amt = eggs.getTotalCollateral();
@@ -62,9 +65,11 @@ contract CounterScript is Script {
         console.log(cday2, day2);
         console.log(cday3, day3);
         console.log(cday4, day4);
-        uint256 borrowed3 = eggs.SONICtoEGGSNoTrade(borrowed2);
-        uint256 collateral3 = (eggs.EGGStoSONIC(collateral2) * 99) / 100;
-        console.log(borrowed2);
+        uint256 borrowed3 = eggs.balanceOf(
+            0x000000000000000000000000000000000000dEaD
+        );
+        uint256 collateral3 = (eggs.EGGStoSONICceil(collateral2) * 99) / 100;
+        console.log("dead", borrowed3);
         console.log(collateral3);
 
         //console.log((priceAfterBomb * 100) / amt2);
@@ -72,7 +77,7 @@ contract CounterScript is Script {
         if (bal > 10000) {
             // eggs.sell(eggs.balanceOf(msg.sender));
         }
-        eggs.buy{value: 10000000000000000}(msg.sender);
+        //eggs.buy{value: 10000000000000000}(msg.sender);
         //}
 
         //eggs.setFeeAddress(msg.sender);
@@ -110,16 +115,15 @@ contract CounterScript is Script {
         console.log(q);
         console.log(q2);
         console.log(vall);
-        console.log(val);
-        uint256 _fee = eggs.getInterestFeeInEggs(borrowed2, 365);
-        eggs.extendLoan{value: _fee}(365);
-        //  eggs.borrow(val, 0);
-        //eggs.borrowMore(vall + val);
+        console.log("borrowmore", vall);
+        uint256 _fee = eggs.getInterestFee(borrowed2, 364);
+        //eggs.extendLoan{value: _fee}(364);
+        // eggs.borrow(val, 0);
+        // eggs.borrowMore(vall + val);
         // eggs.flashClosePosition();
         //eggs.flashClosePosition();
         // uint256 tob = eggs.getTotalBorrowed();
         //console.log(tob);
-        //eggs.flashClosePosition();
 
         /* uint256 _totalColateral = eggs.balanceOf(
             0x5FbDB2315678afecb367f032d93F642f64180aa3
@@ -157,21 +161,32 @@ contract CounterScript is Script {
         uint256 emm = eggs.lastLiquidationDate();
         uint256 emm2 = eggs.lastLiquidationDate() - block.timestamp;
         console.log(emm, endDate, emm2);
+*/
+        uint256 old = (collateral2 * eggs.getBacking()) / eggs.totalSupply();
 
-         uint256 val = eggs.leverageFee(eggtotal * 100, 0);
-        console.log(val);
+        uint256 newGuy = Math.mulDiv(
+            eggs.getBacking(),
+            1e18,
+            eggs.totalSupply()
+        );
+        uint256 newGuy2 = Math.mulDiv(newGuy, collateral2, 1e18);
+        uint256 newGuy3 = Math.mulDiv(newGuy2, 99e18, 100e18);
+        uint256 newGuy4 = Math.mulDiv(old, 99e18, 100e18);
+        uint256 newGuy5 = address(eggs).balance;
+        console.log(borrowed2);
+        console.log(newGuy4);
+        console.log(collateral3);
+        console.log(old / 100);
+        uint256 __val = eggs.leverageFee(1 ether, 0);
+        console.log("bal", val);
 
         //uint256 v4 = eggs.EGGStoSONIC(eggtotal * 100);
 
         //console.log(v4);
 
-        (uint256 v5, uint256 v6, uint256 v7) = eggs.leverage{value: val}(
-            eggtotal * 100,
-            0
-        );
-        console.log(v5);
-        console.log(v6);
-        console.log(v7);*/
+        //eggs.leverage{value: __val + (1 ether / 100)}(1 ether, 0);
+        // eggs.flashClosePosition();
+
         /*
         uint256 balEggs = eggs.balanceOf(msg.sender);
 

@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     address payable private FEE_ADDRESS;
@@ -60,13 +61,13 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         lastLiquidationDate = getMidnightTimestamp(block.timestamp);
 
         uint256 teamMint = msg.value * MIN;
-        require(teamMint >= 10000);
+        require(teamMint >= 1 ether);
         mint(msg.sender, teamMint);
 
         _transfer(
             msg.sender,
             0x000000000000000000000000000000000000dEaD,
-            10000
+            1 ether
         );
     }
     function setStart() public onlyOwner {
@@ -120,6 +121,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         require(receiver != address(0x0), "Reciever cannot be 0x0 address");
 
         // Mint Eggs to sender
+        //tp user round down
         uint256 eggs = SONICtoEGGS(msg.value);
 
         mint(receiver, (eggs * getBuyFee()) / FEE_BASE_1000);
@@ -135,6 +137,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         liquidate();
 
         // Total Eth to be sent
+        //to user round down
         uint256 sonic = EGGStoSONIC(eggs);
 
         // Burn of JAY
@@ -171,6 +174,10 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 numberOfDays
     ) public payable nonReentrant {
         require(start, "Trading must be initialized");
+        require(
+            numberOfDays < 366,
+            "Max borrow/extension must be 365 days or less"
+        );
         liquidate();
 
         Loan memory userLoan = Loans[msg.sender];
@@ -191,8 +198,11 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         uint256 userSonic = sonic - sonicFee;
 
-        uint256 subValue = ((sonicFee * 3) / 10) + (userSonic / 100);
-        uint256 totalFee = (sonicFee + userSonic / 100);
+        uint256 feeAddressAmount = (sonicFee * 3) / 10;
+        uint256 userBorrow = (userSonic * 99) / 100;
+        uint256 overCollateralizationAmount = userSonic - userBorrow;
+        uint256 subValue = feeAddressAmount + overCollateralizationAmount;
+        uint256 totalFee = (sonicFee + overCollateralizationAmount);
         uint256 feeOverage;
         if (msg.value > totalFee) {
             feeOverage = msg.value - totalFee;
@@ -202,13 +212,13 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
             msg.value - feeOverage == totalFee,
             "Insufficient sonic fee sent"
         );
+
+        //to user round down
         uint256 userEggs = SONICtoEGGSLev(userSonic, subValue);
         mint(address(this), userEggs);
-        uint256 feeAddressAmount = (sonicFee * 3) / 10;
+
         require(feeAddressAmount > MIN, "Fees must be higher than min.");
         sendSonic(FEE_ADDRESS, feeAddressAmount);
-
-        uint256 userBorrow = (userSonic * 99) / 100;
 
         addLoansByDate(userBorrow, userEggs, endDate);
         Loans[msg.sender] = Loan({
@@ -225,8 +235,8 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 amount,
         uint256 numberOfDays
     ) public pure returns (uint256) {
-        uint256 interest = ((3900 * numberOfDays) / 365) + 100;
-        return ((amount * interest) / 100 / FEE_BASE_1000);
+        uint256 interest = Math.mulDiv(0.039e18, numberOfDays, 365) + 0.001e18;
+        return Math.mulDiv(amount, interest, 1e18);
     }
 
     function borrow(uint256 sonic, uint256 numberOfDays) public nonReentrant {
@@ -251,6 +261,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         uint256 feeAddressFee = (sonicFee * 3) / 10;
 
+        //eggs required from user round up?
         uint256 userEggs = SONICtoEGGSNoTrade(sonic);
 
         uint256 newUserBorrow = (sonic * 99) / 100;
@@ -286,6 +297,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         uint256 sonicFee = getInterestFee(sonic, newBorrowLength);
 
+        //eggs required from user round up?
         uint256 userEggs = SONICtoEGGSNoTrade(sonic);
         uint256 userBorrowedInEggs = SONICtoEGGSNoTrade(userBorrowed);
         uint256 userExcessInEggs = ((userCollateral) * 99) /
@@ -336,6 +348,8 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
             !isLoanExpired(msg.sender),
             "Your loan has been liquidated, no collateral to remove"
         );
+
+        //to user round down
         require(
             Loans[msg.sender].borrowed <=
                 (EGGStoSONIC(collateral - amount) * 99) / 100,
@@ -384,7 +398,9 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 borrowed = Loans[msg.sender].borrowed;
 
         uint256 collateral = Loans[msg.sender].collateral;
-        uint256 collateralInSonic = EGGStoSONIC(collateral);
+
+        //to protocol round up
+        uint256 collateralInSonic = EGGStoSONICceil(collateral);
         _burn(address(this), collateral);
         require(
             !isLoanExpired(msg.sender),
@@ -563,31 +579,35 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 value,
         uint256 msg_value
     ) public view returns (uint256) {
-        return (value * (getBacking() - msg_value)) / (totalSupply());
+        return Math.mulDiv(value, getBacking() - msg_value, totalSupply());
     }
     function EGGStoSONIC(uint256 value) public view returns (uint256) {
-        return (value * getBacking()) / totalSupply();
+        return Math.mulDiv(value, getBacking(), totalSupply());
+    }
+    function EGGStoSONICceil(uint256 value) public view returns (uint256) {
+        return (value * getBacking() + (totalSupply() - 1)) / totalSupply();
     }
 
     function SONICtoEGGS(uint256 value) public view returns (uint256) {
-        return (value * totalSupply()) / (getBacking() - value);
+        return Math.mulDiv(value, totalSupply(), getBacking() - value);
     }
 
     function SONICtoEGGSLev(
         uint256 value,
         uint256 fee
     ) public view returns (uint256) {
-        return (value * totalSupply()) / (getBacking() - fee);
+        return Math.mulDiv(value, totalSupply(), getBacking() - fee);
     }
     function SONICtoEGGSBorrow(
         uint256 value,
         uint256 fee
     ) public view returns (uint256) {
-        return (value * totalSupply()) / (getBacking() + fee);
+        return Math.mulDiv(value, totalSupply(), getBacking() + fee);
     }
 
     function SONICtoEGGSNoTrade(uint256 value) public view returns (uint256) {
-        return (value * totalSupply()) / (getBacking());
+        uint256 backing = getBacking();
+        return (value * totalSupply() + (backing - 1)) / backing;
     }
 
     function sendSonic(address _address, uint256 _value) internal {
