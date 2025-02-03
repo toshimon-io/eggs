@@ -178,7 +178,6 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
             numberOfDays < 366,
             "Max borrow/extension must be 365 days or less"
         );
-        liquidate();
 
         Loan memory userLoan = Loans[msg.sender];
         if (userLoan.borrowed != 0) {
@@ -190,6 +189,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
                 "Use account with no loans"
             );
         }
+        liquidate();
         uint256 endDate = getMidnightTimestamp(
             (numberOfDays * 1 days) + block.timestamp
         );
@@ -240,7 +240,6 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     }
 
     function borrow(uint256 sonic, uint256 numberOfDays) public nonReentrant {
-        liquidate();
         require(
             numberOfDays < 366,
             "Max borrow/extension must be 365 days or less"
@@ -253,6 +252,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
             Loans[msg.sender].borrowed == 0,
             "Use borrowMore to borrow more"
         );
+        liquidate();
         uint256 endDate = getMidnightTimestamp(
             (numberOfDays * 1 days) + block.timestamp
         );
@@ -284,10 +284,9 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         safetyCheck(sonicFee);
     }
     function borrowMore(uint256 sonic) public nonReentrant {
-        liquidate();
         require(!isLoanExpired(msg.sender), "Loan expired use borrow");
         require(sonic != 0, "Must borrow more than 0");
-
+        liquidate();
         uint256 userBorrowed = Loans[msg.sender].borrowed;
         uint256 userCollateral = Loans[msg.sender].collateral;
         uint256 userEndDate = Loans[msg.sender].endDate;
@@ -342,13 +341,12 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     }
 
     function removeCollateral(uint256 amount) public nonReentrant {
-        liquidate();
-        uint256 collateral = Loans[msg.sender].collateral;
         require(
             !isLoanExpired(msg.sender),
             "Your loan has been liquidated, no collateral to remove"
         );
-
+        liquidate();
+        uint256 collateral = Loans[msg.sender].collateral;
         //to user round down
         require(
             Loans[msg.sender].borrowed <=
@@ -362,8 +360,6 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         safetyCheck(0);
     }
     function repay() public payable nonReentrant {
-        liquidate();
-
         uint256 borrowed = Loans[msg.sender].borrowed;
         require(borrowed > msg.value, "Must repay less than borrowed amount");
         require(msg.value != 0, "Must repay something");
@@ -379,7 +375,6 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         safetyCheck(0);
     }
     function closePosition() public payable nonReentrant {
-        liquidate();
         uint256 borrowed = Loans[msg.sender].borrowed;
         uint256 collateral = Loans[msg.sender].collateral;
         require(
@@ -394,6 +389,10 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         safetyCheck(0);
     }
     function flashClosePosition() public nonReentrant {
+        require(
+            !isLoanExpired(msg.sender),
+            "Your loan has been liquidated, no collateral to remove"
+        );
         liquidate();
         uint256 borrowed = Loans[msg.sender].borrowed;
 
@@ -402,10 +401,6 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         //to protocol round up
         uint256 collateralInSonic = EGGStoSONICceil(collateral);
         _burn(address(this), collateral);
-        require(
-            !isLoanExpired(msg.sender),
-            "Your loan has been liquidated, no collateral to remove"
-        );
 
         uint256 collateralInSonicAfterFee = (collateralInSonic * 99) / 100;
 
@@ -431,7 +426,6 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     function extendLoan(
         uint256 numberOfDays
     ) public payable nonReentrant returns (uint256) {
-        liquidate();
         uint256 oldEndDate = Loans[msg.sender].endDate;
         uint256 borrowed = Loans[msg.sender].borrowed;
         uint256 collateral = Loans[msg.sender].collateral;
