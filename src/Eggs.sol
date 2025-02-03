@@ -121,7 +121,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         require(receiver != address(0x0), "Reciever cannot be 0x0 address");
 
         // Mint Eggs to sender
-        //tp user round down
+        // AUDIT: to user round down
         uint256 eggs = SONICtoEGGS(msg.value);
 
         mint(receiver, (eggs * getBuyFee()) / FEE_BASE_1000);
@@ -137,7 +137,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         liquidate();
 
         // Total Eth to be sent
-        //to user round down
+        // AUDIT: to user round down
         uint256 sonic = EGGStoSONIC(eggs);
 
         // Burn of JAY
@@ -213,7 +213,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
             "Insufficient sonic fee sent"
         );
 
-        //to user round down
+        // AUDIT: to user round down
         uint256 userEggs = SONICtoEGGSLev(userSonic, subValue);
         mint(address(this), userEggs);
 
@@ -261,7 +261,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         uint256 feeAddressFee = (sonicFee * 3) / 10;
 
-        //eggs required from user round up?
+        //AUDIT: eggs required from user round up?
         uint256 userEggs = SONICtoEGGSNoTrade(sonic);
 
         uint256 newUserBorrow = (sonic * 99) / 100;
@@ -296,7 +296,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         uint256 sonicFee = getInterestFee(sonic, newBorrowLength);
 
-        //eggs required from user round up?
+        //AUDIT: eggs required from user round up?
         uint256 userEggs = SONICtoEGGSNoTrade(sonic);
         uint256 userBorrowedInEggs = SONICtoEGGSNoTrade(userBorrowed);
         uint256 userExcessInEggs = ((userCollateral) * 99) /
@@ -347,7 +347,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         );
         liquidate();
         uint256 collateral = Loans[msg.sender].collateral;
-        //to user round down
+        // AUDIT: to user round down
         require(
             Loans[msg.sender].borrowed <=
                 (EGGStoSONIC(collateral - amount) * 99) / 100,
@@ -398,7 +398,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         uint256 collateral = Loans[msg.sender].collateral;
 
-        //to protocol round up
+        // AUDIT: from user round up
         uint256 collateralInSonic = EGGStoSONICceil(collateral);
         _burn(address(this), collateral);
 
