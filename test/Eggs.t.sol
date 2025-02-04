@@ -18,67 +18,122 @@ contract EggsTest is Test {
     function setUp() public {
         eggs = new EGGS{value: 0.01 ether}();
         uint256 nal = address(eggs).balance;
-        console.log(nal);
-        eggs.setStart();
-        eggs.setFeeAddress(msg.sender);
+        //console.log(nal);
+        eggs.setFeeAddress(0xcE6ad0CA1C0a661c06098298B0e166a2b0DC38f7);
 
-        eggs.buy{value: 0.1 ether}(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
-        nal = address(eggs).balance;
-        console.log(nal);
+        eggs.setStart();
     }
-    function test_BorrowAndRepay() public {
-        uint256 val = eggs.EGGStoSONIC(eggs.balanceOf(msg.sender)); // -
-        uint256 nal = address(eggs).balance;
-        console.log(val);
-        console.log(nal);
-        eggs.borrow(val, 0);
-        (uint256 cday1, uint day1) = eggs.getLoansExpiringByDate(
-            block.timestamp
+    function testBorrowAndFlashClose() public {
+        vm.deal(address(0xBEEF), 1e18);
+        vm.startPrank(address(0xBEEF));
+
+        eggs.buy{value: 1e18}(address(0xBEEF));
+
+        uint256 maxBorrowAmount = eggs.EGGStoSONIC(
+            eggs.balanceOf(address(0xBEEF))
         );
-        (
-            uint256 collateral,
-            uint256 borrowed,
-            uint256 end,
-            uint256 daysmount
-        ) = eggs.Loans(msg.sender);
-        assertEq(collateral, cday1);
-        assertEq(borrowed, day1);
+        eggs.borrow(maxBorrowAmount, 0);
 
         eggs.flashClosePosition();
 
-        (uint256 cday2, uint day2) = eggs.getLoansExpiringByDate(
-            block.timestamp
+        vm.stopPrank();
+    }
+    function testLeverageAndFlashClose() public {
+        vm.deal(address(0xBEEF), 1e18);
+        vm.startPrank(address(0xBEEF));
+        uint256 fee = eggs.leverageFee(1 ether, 0);
+        eggs.leverage{value: fee + (1 ether / 100)}(1 ether, 0);
+
+        eggs.flashClosePosition();
+
+        vm.stopPrank();
+    }
+    function testBuySell() public {
+        vm.deal(address(0xBEEF), 1e18);
+        vm.startPrank(address(0xBEEF));
+        eggs.buy{value: 1e18}(address(0xBEEF));
+
+        uint256 maxSell = eggs.balanceOf(address(0xBEEF));
+        eggs.sell(maxSell);
+
+        vm.stopPrank();
+    }
+    function testBorrowFxnsLeverage() public {
+        vm.deal(address(0xBEEF), 1e18);
+        vm.startPrank(address(0xBEEF));
+
+        eggs.buy{value: 1e18}(address(0xBEEF));
+
+        uint256 maxBorrowAmount = eggs.EGGStoSONIC(
+            eggs.balanceOf(address(0xBEEF))
         );
-        assertEq(cday2, 0);
-        assertEq(day2, 0);
+        eggs.borrow(maxBorrowAmount, 0);
 
-        /*eggs.buy{value: 7780962683658298567970046477}(msg.sender);
-        assertEq(eggs.totalSupply(), 190000000000000000000000);*/
-    }
+        (, uint256 borrowed, ) = eggs.getLoanByAddress(address(0xBEEF));
 
-    function test_Increment() public {
-        /*eggs.buy{value: 7780962683658298567970046477}(msg.sender);
-        assertEq(eggs.totalSupply(), 190000000000000000000000);*/
-    }
+        // extendLoan
+        uint256 extendFee = eggs.getInterestFee(borrowed, 5);
+        vm.deal(address(0xBEEF), extendFee);
+        eggs.extendLoan{value: extendFee}(5);
 
-    /*  function testFuzz_SetNumber(uint256 x) public {
-        if (x > MIN && x < MAX) {
-            uint256 total = eggs.getBuyAmount(x);
-            eggs.buy{value: x}(0xF58764c35eD1528Ec78DF18BebB24Fa20f6A626F);
-            assertEq(
-                eggs.balanceOf(0xF58764c35eD1528Ec78DF18BebB24Fa20f6A626F),
-                total
-            );
-        }
+        // partial repay
+        vm.deal(address(0xBEEF), borrowed / 2);
+        eggs.repay{value: borrowed / 2}();
+
+        // borrowMore
+        eggs.borrowMore(borrowed / 2);
+
+        eggs.repay{value: borrowed / 4}();
+
+        // remove
+        (uint256 collateral, uint256 borrowedRemove, ) = eggs.getLoanByAddress(
+            address(0xBEEF)
+        );
+
+        uint256 removeAmount = (collateral * 99) /
+            100 -
+            eggs.SONICtoEGGSNoTrade(borrowedRemove);
+        eggs.removeCollateral(removeAmount);
+
+        eggs.flashClosePosition();
+
+        vm.stopPrank();
     }
-    function testFuzz_Borrow(uint256 x) public {
-        if (x > MIN && x < MAX) {
-            uint256 total = eggs.getBuyAmount(x);
-            eggs.buy{value: x}(0xF58764c35eD1528Ec78DF18BebB24Fa20f6A626F);
-            assertEq(
-                eggs.balanceOf(0xF58764c35eD1528Ec78DF18BebB24Fa20f6A626F),
-                total
-            );
-        }
-    }*/
+    function testBorrowFxns() public {
+        vm.deal(address(0xBEEF), 1e18);
+        vm.startPrank(address(0xBEEF));
+
+        uint256 fee = eggs.leverageFee(1 ether, 0);
+        eggs.leverage{value: fee + (1 ether / 100)}(1 ether, 0);
+
+        (, uint256 borrowed, ) = eggs.getLoanByAddress(address(0xBEEF));
+
+        // extendLoan
+        uint256 extendFee = eggs.getInterestFee(borrowed, 5);
+        vm.deal(address(0xBEEF), extendFee);
+        eggs.extendLoan{value: extendFee}(5);
+
+        // partial repay
+        vm.deal(address(0xBEEF), borrowed / 2);
+        eggs.repay{value: borrowed / 2}();
+
+        // borrowMore
+        eggs.borrowMore(borrowed / 2);
+
+        eggs.repay{value: borrowed / 4}();
+
+        // remove
+        (uint256 collateral, uint256 borrowedRemove, ) = eggs.getLoanByAddress(
+            address(0xBEEF)
+        );
+
+        uint256 removeAmount = (collateral * 99) /
+            100 -
+            eggs.SONICtoEGGSNoTrade(borrowedRemove);
+        eggs.removeCollateral(removeAmount);
+
+        eggs.flashClosePosition();
+
+        vm.stopPrank();
+    }
 }
