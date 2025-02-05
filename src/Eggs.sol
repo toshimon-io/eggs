@@ -46,7 +46,8 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     event MaxUpdated(uint256 max);
     event SellFeeUpdated(uint256 sellFee);
     event FeeAddressUpdated(address _address);
-    event buyFeeUpdated(uint256 buyFee);
+    event BuyFeeUpdated(uint256 buyFee);
+    event LeverageFeeUpdated(uint256 leverageFee);
     event Started(bool started);
     event Liquidate(uint256 time, uint256 amount);
     event LoanDataUpdate(
@@ -94,25 +95,22 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     }
 
     function setBuyFee(uint16 amount) external onlyOwner {
-        require(
-            amount <= 992 - FEES_BUY,
-            "buy fee must be greater than FEES_BUY"
-        );
+        require(amount <= 992, "buy fee must be greater than FEES_BUY");
         require(amount >= 975, "buy fee must be less than 2.5%");
         buy_fee = amount;
-        emit buyFeeUpdated(amount);
+        emit BuyFeeUpdated(amount);
     }
     function setBuyFeeLeverage(uint16 amount) external onlyOwner {
         require(amount <= 25, "leverage buy fee must be less 2.5%");
         require(amount >= 0, "leverage buy fee must be greater than 0%");
         buy_fee_leverage = amount;
-        emit buyFeeUpdated(amount);
+        emit LeverageFeeUpdated(amount);
     }
     function setSellFee(uint16 amount) external onlyOwner {
         require(amount <= 992, "sell fee must be greater than FEES_SELL");
         require(amount >= 975, "sell fee must be less than 2.5%");
         sell_fee = amount;
-        emit buyFeeUpdated(amount);
+        emit SellFeeUpdated(amount);
     }
     function buy(address receiver) external payable nonReentrant {
         liquidate();
@@ -200,7 +198,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         uint256 feeAddressAmount = (sonicFee * 3) / 10;
         uint256 userBorrow = (userSonic * 99) / 100;
-        uint256 overCollateralizationAmount = userSonic - userBorrow;
+        uint256 overCollateralizationAmount = (userSonic) / 100;
         uint256 subValue = feeAddressAmount + overCollateralizationAmount;
         uint256 totalFee = (sonicFee + overCollateralizationAmount);
         uint256 feeOverage;
@@ -590,7 +588,8 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 value,
         uint256 fee
     ) public view returns (uint256) {
-        return Math.mulDiv(value, totalSupply(), getBacking() - fee);
+        uint256 backing = getBacking() - fee;
+        return (value * totalSupply() + (backing - 1)) / backing;
     }
     function SONICtoEGGSBorrow(
         uint256 value,
@@ -602,6 +601,12 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     function SONICtoEGGSNoTrade(uint256 value) public view returns (uint256) {
         uint256 backing = getBacking();
         return (value * totalSupply() + (backing - 1)) / backing;
+    }
+    function SONICtoEGGSNoTradeFloor(
+        uint256 value
+    ) public view returns (uint256) {
+        uint256 backing = getBacking();
+        return (value * totalSupply()) / backing;
     }
 
     function sendSonic(address _address, uint256 _value) internal {

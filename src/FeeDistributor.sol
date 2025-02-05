@@ -60,6 +60,9 @@ contract JayFeeSplitter is Ownable2Step, ReentrancyGuard {
         s_campaignParameters = newCampaignParameters_;
     }
 
+    receive() external payable {
+        notifyRewardAmount(msg.value);
+    }
     function notifyRewardAmount(uint256 amount_) internal {
         uint256 duration = block.timestamp - lastDistributionBlock;
         if (duration >= 1 weeks) {
@@ -102,9 +105,5 @@ contract JayFeeSplitter is Ownable2Step, ReentrancyGuard {
     function sendSonic(address _address, uint256 _value) internal {
         (bool success, ) = _address.call{value: _value}("");
         require(success, "SONIC Transfer failed.");
-    }
-
-    receive() external payable {
-        notifyRewardAmount(msg.value);
     }
 }
