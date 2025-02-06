@@ -1,4 +1,4 @@
-//SPDX-License-Identifier: MIT
+//SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
@@ -595,7 +595,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     }
     function SONICtoEGGSNoTrade(uint256 value) public view returns (uint256) {
         uint256 backing = getBacking();
-        return (value * totalSupply()) / backing;
+        return Math.mulDiv(value, totalSupply(), backing);
     }
 
     function sendSonic(address _address, uint256 _value) internal {

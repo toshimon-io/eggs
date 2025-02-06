@@ -145,31 +145,52 @@ contract EggsTest is Test {
     }
     function testBorrowFxnsLeverage(uint256 seed) public {
         vm.deal(address(0xBEEF), 1e18);
+        address[10] memory addresses = [
+            address(0xBEF2),
+            address(0xBEF1),
+            address(0xBEF3),
+            address(0xBEF4),
+            address(0xBEF5),
+            address(0xBEF6),
+            address(0xBEF7),
+            address(0xBEF8),
+            address(0xBEF9),
+            address(0xBEE3)
+        ];
         eggs.buy{value: 1e18}(address(0xBEF2));
         uint256 x;
         for (uint256 i; i < 1000000; i++) {
-            vm.startPrank(address(0xBEEF));
+            uint256 _seed;
+            if (seed > i + x + 2) {
+                _seed = seed - i;
+            } else seed = seed + i;
+            uint256 add = getRandomNumber(_seed);
+            if (add > 9) add = 0;
+            address addy = addresses[add];
+            vm.startPrank(addy);
             vm.pauseGasMetering();
 
-            uint256 k = getRandomNumber(seed / (i + x + 2));
+            uint256 k = getRandomNumber(_seed / 2 + i);
 
             while (k > 10) {
                 k = k - 1;
             }
             if (k == x) x = x + 1;
             else x = k;
-            console.log("test", x);
-            console.log("test", i);
-            uint256 eggsBall = eggs.balanceOf(address(0xBEEF));
+            console.log("addy", add);
+            console.log("test Total", i);
+            uint256 eggsBall = eggs.balanceOf(addy);
             (uint256 collateral, uint256 borrowed, uint256 endDate) = eggs
-                .getLoanByAddress(address(0xBEEF));
-            console.log("Test", x);
+                .getLoanByAddress(addy);
+            console.log("Test #", x);
+            uint256 price = eggs.lastPrice();
+            console.log("price", price);
             if (x == 0) {
-                vm.deal(address(0xBEEF), 50000000e18);
-                eggs.buy{value: 50000000e18}(address(0xBEEF));
+                vm.deal(addy, 5000000e18);
+                eggs.buy{value: 5000000e18}(addy);
             }
             if (x == 1) {
-                uint256 maxSell = eggs.balanceOf(address(0xBEEF));
+                uint256 maxSell = eggs.balanceOf(addy);
 
                 if (maxSell > 1e18) {
                     //console.log(maxSell);
@@ -181,10 +202,10 @@ contract EggsTest is Test {
             if (x == 2) {
                 if (borrowed == 0) {
                     if (eggsBall < 1e18) {
-                        vm.deal(address(0xBEEF), 50000000e18);
+                        vm.deal(addy, 5000000e18);
 
-                        eggs.buy{value: 50000000e18}(address(0xBEEF));
-                        eggsBall = eggs.balanceOf(address(0xBEEF));
+                        eggs.buy{value: 5000000e18}(addy);
+                        eggsBall = eggs.balanceOf(addy);
                     }
                     //console.log(eggsBall);
                     uint256 maxBorrowAmount = eggs.EGGStoSONIC(eggsBall);
@@ -209,25 +230,25 @@ contract EggsTest is Test {
             }
             if (x == 3) {
                 if (borrowed == 0) {
-                    vm.deal(address(0xBEEF), 50000000e18);
+                    vm.deal(addy, 5000000e18);
 
                     uint256 fee = eggs.leverageFee(10000 ether, 0);
                     eggs.leverage{value: fee + (1 ether / 100)}(1 ether, 0);
                 } else {
                     uint256 extendFee = eggs.getInterestFee(borrowed, 5);
-                    vm.deal(address(0xBEEF), extendFee);
+                    vm.deal(addy, extendFee);
                     if ((endDate + 5 days - block.timestamp) / 1 days < 365)
                         eggs.extendLoan{value: extendFee}(5);
                 }
             }
             if (x == 4) {
                 if (borrowed == 0) {
-                    /* vm.deal(address(0xBEEF), 1e18);
+                    /* vm.deal(addy, 1e18);
 
                     uint256 fee = eggs.leverageFee(1 ether, 0);
                     eggs.leverage{value: fee + (1 ether / 100)}(1 ether, 0);*/
                 } else {
-                    vm.deal(address(0xBEEF), borrowed / 2);
+                    vm.deal(addy, borrowed / 2);
                     if (borrowed / 2 > 1e10) {
                         console.log("repay");
                         eggs.repay{value: borrowed / 2}();
@@ -238,10 +259,10 @@ contract EggsTest is Test {
             if (x == 5) {
                 if (borrowed == 0) {
                     /* if (eggsBall < 100000000) {
-                        vm.deal(address(0xBEEF), 1e18);
+                        vm.deal(addy, 1e18);
 
-                        eggs.buy{value: 1e18}(address(0xBEEF));
-                        eggsBall = eggs.balanceOf(address(0xBEEF));
+                        eggs.buy{value: 1e18}(addy);
+                        eggsBall = eggs.balanceOf(addy);
                     }
                     uint256 maxBorrowAmount = eggs.EGGStoSONIC(eggsBall);
                     eggs.borrow(maxBorrowAmount, 0);*/
@@ -250,8 +271,7 @@ contract EggsTest is Test {
                         100;
                     if (colatInSonic > borrowed) {
                         uint256 removeAmount = eggs.SONICtoEGGSNoTrade(
-                            ((eggs.EGGStoSONICceil(collateral) * 99) / 100) -
-                                borrowed
+                            colatInSonic - borrowed
                         );
                         if (removeAmount > 10000000000) {
                             eggs.removeCollateral(removeAmount);
@@ -262,16 +282,16 @@ contract EggsTest is Test {
             if (x == 6) {
                 if (borrowed == 0) {
                     if (eggsBall < 1e18) {
-                        vm.deal(address(0xBEEF), 100e18);
+                        vm.deal(addy, 100e18);
 
-                        eggs.buy{value: 100e18}(address(0xBEEF));
-                        eggsBall = eggs.balanceOf(address(0xBEEF));
+                        eggs.buy{value: 100e18}(addy);
+                        eggsBall = eggs.balanceOf(addy);
                     }
                     uint256 maxBorrowAmount = eggs.EGGStoSONIC(eggsBall);
                     eggs.borrow(maxBorrowAmount, 0);
                 } else {
                     (uint256 collateral, uint256 borrowed, ) = eggs
-                        .getLoanByAddress(address(0xBEEF));
+                        .getLoanByAddress(addy);
                     //console.log(collateral);
                     //console.log(borrowed);
                     //  uint256 collateralInS = eggs.EGGStoSONIC(collateral);
@@ -292,24 +312,24 @@ contract EggsTest is Test {
             }
             if (x == 7) {
                 if (borrowed == 0) {
-                    /* vm.deal(address(0xBEEF), 1e18);
+                    /* vm.deal(addy, 1e18);
 
                     uint256 fee = eggs.leverageFee(1 ether, 0);
                     eggs.leverage{value: fee + (1 ether / 100)}(1 ether, 0);*/
                 } else {
-                    vm.deal(address(0xBEEF), borrowed);
+                    vm.deal(addy, borrowed);
                     eggs.closePosition{value: borrowed}();
                 }
             }
             if (x == 8) {
                 if (borrowed == 0) {
-                    /*vm.deal(address(0xBEEF), 1e18);
+                    /*vm.deal(addy, 1e18);
 
                     uint256 fee = eggs.leverageFee(1 ether, 0);
                     eggs.leverage{value: fee + (1 ether / 100)}(1 ether, 0);*/
                 } else {
-                    vm.deal(address(0xBEEF), borrowed);
-                    uint256 bal = address(0xBEEF).balance;
+                    vm.deal(addy, borrowed);
+                    uint256 bal = addy.balance;
                     console.log(borrowed);
                     console.log(bal);
                     console.log(collateral);
@@ -321,20 +341,21 @@ contract EggsTest is Test {
             if (x == 9) {
                 if (borrowed == 0) {
                     if (eggsBall < 1e18) {
-                        vm.deal(address(0xBEEF), 50000000e18);
+                        vm.deal(addy, 5000000e18);
 
-                        eggs.buy{value: 50000000e18}(address(0xBEEF));
-                        eggsBall = eggs.balanceOf(address(0xBEEF));
+                        eggs.buy{value: 5000000e18}(addy);
+                        eggsBall = eggs.balanceOf(addy);
                     }
                     console.log("borrow");
                     //console.log(eggsBall);
                     uint256 maxBorrowAmount = eggs.EGGStoSONIC(eggsBall);
+
                     console.log("borrowCov");
                     console.log(maxBorrowAmount);
                     eggs.borrow(maxBorrowAmount, 0);
                 } else {
                     uint256 conv = eggs.SONICtoEGGSNoTradeCeil(borrowed) +
-                        ((eggs.balanceOf(address(0xBEEF)) * 99) / 100);
+                        ((eggs.balanceOf(addy) * 99) / 100);
                     uint256 colatMax = ((collateral) * 99) / 100;
                     //console.log(conv);
                     //console.log(colatMax);
