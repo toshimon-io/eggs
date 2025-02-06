@@ -260,7 +260,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 feeAddressFee = (sonicFee * 3) / 10;
 
         //AUDIT: eggs required from user round up?
-        uint256 userEggs = SONICtoEGGSNoTrade(sonic);
+        uint256 userEggs = SONICtoEGGSNoTradeCeil(sonic);
 
         uint256 newUserBorrow = (sonic * 99) / 100;
 
@@ -295,7 +295,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 sonicFee = getInterestFee(sonic, newBorrowLength);
 
         //AUDIT: eggs required from user round up?
-        uint256 userEggs = SONICtoEGGSNoTrade(sonic);
+        uint256 userEggs = SONICtoEGGSNoTradeCeil(sonic);
         uint256 userBorrowedInEggs = SONICtoEGGSNoTrade(userBorrowed);
         uint256 userExcessInEggs = ((userCollateral) * 99) /
             100 -
@@ -397,7 +397,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 collateral = Loans[msg.sender].collateral;
 
         // AUDIT: from user round up
-        uint256 collateralInSonic = EGGStoSONICceil(collateral);
+        uint256 collateralInSonic = EGGStoSONIC(collateral);
         _burn(address(this), collateral);
 
         uint256 collateralInSonicAfterFee = (collateralInSonic * 99) / 100;
@@ -567,12 +567,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         lastPrice = newPrice;
         emit Price(block.timestamp, newPrice, sonic);
     }
-    function EGGStoSONICLev(
-        uint256 value,
-        uint256 msg_value
-    ) public view returns (uint256) {
-        return Math.mulDiv(value, getBacking() - msg_value, totalSupply());
-    }
+
     function EGGStoSONIC(uint256 value) public view returns (uint256) {
         return Math.mulDiv(value, getBacking(), totalSupply());
     }
@@ -591,20 +586,14 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 backing = getBacking() - fee;
         return (value * totalSupply() + (backing - 1)) / backing;
     }
-    function SONICtoEGGSBorrow(
-        uint256 value,
-        uint256 fee
-    ) public view returns (uint256) {
-        return Math.mulDiv(value, totalSupply(), getBacking() + fee);
-    }
 
-    function SONICtoEGGSNoTrade(uint256 value) public view returns (uint256) {
+    function SONICtoEGGSNoTradeCeil(
+        uint256 value
+    ) public view returns (uint256) {
         uint256 backing = getBacking();
         return (value * totalSupply() + (backing - 1)) / backing;
     }
-    function SONICtoEGGSNoTradeFloor(
-        uint256 value
-    ) public view returns (uint256) {
+    function SONICtoEGGSNoTrade(uint256 value) public view returns (uint256) {
         uint256 backing = getBacking();
         return (value * totalSupply()) / backing;
     }
