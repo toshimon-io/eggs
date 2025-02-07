@@ -143,6 +143,9 @@ contract EggsTest is Test {
 
         vm.stopPrank();
     }
+    uint128 private constant SONICinWEI = 1 * 10 ** 18;
+    uint128 public constant maxSupply = 50 ** 11 * SONICinWEI;
+
     function testBorrowFxnsLeverage(uint256 seed) public {
         vm.deal(address(0xBEEF), 1e18);
         address[10] memory addresses = [
@@ -180,14 +183,17 @@ contract EggsTest is Test {
             console.log("addy", add);
             console.log("test Total", i);
             uint256 eggsBall = eggs.balanceOf(addy);
+            uint256 remaining = maxSupply - eggs.totalMinted();
             (uint256 collateral, uint256 borrowed, uint256 endDate) = eggs
                 .getLoanByAddress(addy);
             console.log("Test #", x);
             uint256 price = eggs.lastPrice();
             console.log("price", price);
+            console.log("price", remaining);
+
             if (x == 0) {
-                vm.deal(addy, 5000000e18);
-                eggs.buy{value: 5000000e18}(addy);
+                vm.deal(addy, 50000e18);
+                eggs.buy{value: 50000e18}(addy);
             }
             if (x == 1) {
                 uint256 maxSell = eggs.balanceOf(addy);
@@ -202,9 +208,9 @@ contract EggsTest is Test {
             if (x == 2) {
                 if (borrowed == 0) {
                     if (eggsBall < 1e18) {
-                        vm.deal(addy, 5000000e18);
+                        vm.deal(addy, 50000e18);
 
-                        eggs.buy{value: 5000000e18}(addy);
+                        eggs.buy{value: 50000e18}(addy);
                         eggsBall = eggs.balanceOf(addy);
                     }
                     //console.log(eggsBall);
@@ -230,7 +236,7 @@ contract EggsTest is Test {
             }
             if (x == 3) {
                 if (borrowed == 0) {
-                    vm.deal(addy, 5000000e18);
+                    vm.deal(addy, 50000e18);
 
                     uint256 fee = eggs.leverageFee(10000 ether, 0);
                     eggs.leverage{value: fee + (1 ether / 100)}(1 ether, 0);
@@ -341,9 +347,9 @@ contract EggsTest is Test {
             if (x == 9) {
                 if (borrowed == 0) {
                     if (eggsBall < 1e18) {
-                        vm.deal(addy, 5000000e18);
+                        vm.deal(addy, 50000e18);
 
-                        eggs.buy{value: 5000000e18}(addy);
+                        eggs.buy{value: 50000e18}(addy);
                         eggsBall = eggs.balanceOf(addy);
                     }
                     console.log("borrow");
@@ -373,6 +379,7 @@ contract EggsTest is Test {
             if (x == 10) {
                 vm.warp(block.timestamp + 1 days);
             }
+            uint256 breakIt = 9999998 - i;
             vm.stopPrank();
         }
     }

@@ -26,7 +26,7 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     uint256 private totalBorrowed = 0;
     uint256 private totalCollateral = 0;
 
-    uint128 public constant maxSupply = 10 ** 11 * SONICinWEI;
+    uint128 public constant maxSupply = 50 ** 11 * SONICinWEI;
     uint256 public totalMinted;
     uint256 public lastPrice = 0;
 
@@ -152,6 +152,8 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         safetyCheck(sonic);
     }
+
+    // Calculation may be off if liqudation is due to occur
     function getBuyAmount(uint256 amount) public view returns (uint256) {
         uint256 eggs = SONICtoEGGSNoTrade(amount);
         return ((eggs * getBuyFee()) / FEE_BASE_1000);
