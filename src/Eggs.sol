@@ -573,9 +573,6 @@ contract EGGS is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     function EGGStoSONIC(uint256 value) public view returns (uint256) {
         return Math.mulDiv(value, getBacking(), totalSupply());
     }
-    function EGGStoSONICceil(uint256 value) public view returns (uint256) {
-        return (value * getBacking() + (totalSupply() - 1)) / totalSupply();
-    }
 
     function SONICtoEGGS(uint256 value) public view returns (uint256) {
         return Math.mulDiv(value, totalSupply(), getBacking() - value);
